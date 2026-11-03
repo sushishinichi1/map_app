@@ -8,7 +8,8 @@
     "scheme": "careerapp",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "supportsTablet": false
     },
     "android": {
       "adaptiveIcon": {
@@ -25,6 +26,12 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "現在地を地図に表示するために位置情報を使用します。"
+        }
+      ],
       [
         "expo-splash-screen",
         {
