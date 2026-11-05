@@ -27,6 +27,10 @@ export function SpotEditModal({ spot, isSaving, onCancel, onSave }: Props) {
   const [error, setError] = useState<string | null>(null);
   const submittingRef = useRef(false);
 
+  const cancel = () => {
+    if (!isSaving && !submittingRef.current) onCancel();
+  };
+
   const submit = async () => {
     const trimmedName = name.trim();
     if (!trimmedName) {
@@ -46,11 +50,11 @@ export function SpotEditModal({ spot, isSaving, onCancel, onSave }: Props) {
   };
 
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onCancel}>
+    <Modal visible transparent animationType="slide" onRequestClose={cancel}>
       <KeyboardAvoidingView
         style={styles.backdrop}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
+        <Pressable style={StyleSheet.absoluteFill} onPress={cancel} />
         <View style={styles.sheet}>
           <Text style={styles.label}>EDIT SPOT</Text>
           <Text style={styles.title}>スポットを編集</Text>
@@ -74,7 +78,7 @@ export function SpotEditModal({ spot, isSaving, onCancel, onSave }: Props) {
           />
           {error && <Text style={styles.error}>{error}</Text>}
           <View style={styles.actions}>
-            <Pressable disabled={isSaving} onPress={onCancel} style={styles.cancelButton}>
+            <Pressable disabled={isSaving} onPress={cancel} style={styles.cancelButton}>
               <Text style={styles.cancelText}>キャンセル</Text>
             </Pressable>
             <Pressable
