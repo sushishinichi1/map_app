@@ -8,6 +8,7 @@ import { useSpots } from '@/hooks/use-spots';
 import type { CreateSpotInput, Spot } from '@/types/spot';
 import { LocationStateView } from './location-state-view';
 import { SpotDetailModal } from './spot-detail-modal';
+import { SpotEditModal } from './spot-edit-modal';
 import { SpotFormModal } from './spot-form-modal';
 
 type Coordinate = { latitude: number; longitude: number };
@@ -19,6 +20,7 @@ export function LocationMap() {
   const spotState = useSpots();
   const [draftCoordinate, setDraftCoordinate] = useState<Coordinate | null>(null);
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
+  const [editingSpot, setEditingSpot] = useState<Spot | null>(null);
 
   if (location.status === 'loading') return <LocationStateView />;
   if (location.status === 'error') {
@@ -37,6 +39,31 @@ export function LocationMap() {
   };
 
   const saveSpot = async (input: CreateSpotInput) => (await spotState.createSpot(input)) !== null;
+
+  const editSpot = (spot: Spot) => {
+    setSelectedSpot(null);
+    setEditingSpot(spot);
+    spotState.clearError();
+  };
+
+  const cancelEdit = () => {
+    setSelectedSpot(editingSpot);
+    setEditingSpot(null);
+  };
+
+  const saveEditedSpot = async (input: Pick<Spot, 'name' | 'note'>) => {
+    if (!editingSpot) return false;
+    const updated = await spotState.updateSpot(editingSpot.id, {
+      ...input,
+      latitude: editingSpot.latitude,
+      longitude: editingSpot.longitude,
+    });
+    if (!updated) return false;
+
+    setEditingSpot(null);
+    setSelectedSpot(updated);
+    return true;
+  };
 
   const confirmDelete = (spot: Spot) => {
     Alert.alert('スポットを削除', `「${spot.name}」を削除しますか？`, [
@@ -100,7 +127,8 @@ export function LocationMap() {
     </Pressable>
 
     <SpotFormModal coordinate={draftCoordinate} isSaving={spotState.isMutating} onCancel={() => setDraftCoordinate(null)} onSave={saveSpot} />
-    <SpotDetailModal spot={selectedSpot} isDeleting={spotState.isMutating} onClose={() => setSelectedSpot(null)} onDelete={confirmDelete} />
+    <SpotDetailModal spot={selectedSpot} isMutating={spotState.isMutating} onClose={() => setSelectedSpot(null)} onEdit={editSpot} onDelete={confirmDelete} />
+    {editingSpot && <SpotEditModal spot={editingSpot} isSaving={spotState.isMutating} onCancel={cancelEdit} onSave={saveEditedSpot} />}
   </View>;
 }
 
