@@ -11,11 +11,13 @@ import { LocationStateView } from './location-state-view';
 import { SpotDetailModal } from './spot-detail-modal';
 import { SpotEditModal } from './spot-edit-modal';
 import { SpotFormModal } from './spot-form-modal';
+import { SpotListModal } from './spot-list-modal';
 
 type Coordinate = { latitude: number; longitude: number };
 
 export function LocationMap() {
   const mapRef = useRef<MapView>(null);
+  const pendingDetailSpotRef = useRef<Spot | null>(null);
   const insets = useSafeAreaInsets();
   const location = useCurrentLocation();
   const spotState = useSpots();
@@ -23,6 +25,7 @@ export function LocationMap() {
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   const [editingSpot, setEditingSpot] = useState<Spot | null>(null);
   const [isPhotoBusy, setIsPhotoBusy] = useState(false);
+  const [isSpotListVisible, setIsSpotListVisible] = useState(false);
 
   if (location.status === 'loading') return <LocationStateView />;
   if (location.status === 'error') {
@@ -145,6 +148,27 @@ export function LocationMap() {
     ]);
   };
 
+  const selectSpotFromList = (spot: Spot) => {
+    setIsSpotListVisible(false);
+    pendingDetailSpotRef.current = spot;
+    mapRef.current?.animateToRegion(
+      {
+        latitude: spot.latitude,
+        longitude: spot.longitude,
+        latitudeDelta: 0.012,
+        longitudeDelta: 0.012,
+      },
+      450,
+    );
+  };
+
+  const openPendingSpotDetail = () => {
+    const spot = pendingDetailSpotRef.current;
+    if (!spot) return;
+    pendingDetailSpotRef.current = null;
+    setSelectedSpot(spot);
+  };
+
   return <View style={styles.container}>
     <MapView
       ref={mapRef}
@@ -153,6 +177,7 @@ export function LocationMap() {
       mapType="standard"
       showsCompass
       showsUserLocation={false}
+      onRegionChangeComplete={openPendingSpotDetail}
       onLongPress={handleLongPress}>
       <Marker coordinate={location.coordinates} title="現在地" anchor={{ x: 0.5, y: 0.5 }}>
         <View style={styles.currentLocationOuter}><View style={styles.currentLocationInner} /></View>
@@ -187,6 +212,20 @@ export function LocationMap() {
       <Text style={styles.locationButtonIcon}>◎</Text>
     </Pressable>
 
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`スポット一覧、${spotState.spots.length}件`}
+      onPress={() => setIsSpotListVisible(true)}
+      style={({ pressed }) => [
+        styles.spotListButton,
+        { bottom: insets.bottom + 24 },
+        pressed && styles.locationButtonPressed,
+      ]}>
+      <Text style={styles.spotListButtonText}>スポット一覧</Text>
+      <View style={styles.spotCountBadge}><Text style={styles.spotCountText}>{spotState.spots.length}</Text></View>
+    </Pressable>
+
+    <SpotListModal visible={isSpotListVisible} spots={spotState.spots} onClose={() => setIsSpotListVisible(false)} onSelect={selectSpotFromList} />
     <SpotFormModal coordinate={draftCoordinate} isSaving={spotState.isMutating} onCancel={() => setDraftCoordinate(null)} onSave={saveSpot} />
     <SpotDetailModal spot={selectedSpot} isMutating={spotState.isMutating || isPhotoBusy} onClose={() => { if (!spotState.isMutating && !isPhotoBusy) setSelectedSpot(null); }} onEdit={editSpot} onDelete={confirmDelete} onChangePhoto={(spot) => void changePhoto(spot)} onRemovePhoto={confirmRemovePhoto} />
     {editingSpot && <SpotEditModal spot={editingSpot} isSaving={spotState.isMutating} onCancel={cancelEdit} onSave={saveEditedSpot} />}
@@ -202,4 +241,6 @@ const styles = StyleSheet.create({
   errorBanner: { position: 'absolute', left: 16, right: 16, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, backgroundColor: '#FFF0F0', shadowColor: '#0A1930', shadowOpacity: 0.12, shadowRadius: 8 }, errorText: { flex: 1, color: '#A42626', fontSize: 13, fontWeight: '600' }, errorClose: { color: '#A42626', fontSize: 20, marginLeft: 8 },
   locationButton: { position: 'absolute', right: 18, width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF', shadowColor: '#0A1930', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.2, shadowRadius: 10 },
   locationButtonPressed: { opacity: 0.72, transform: [{ scale: 0.96 }] }, locationButtonIcon: { color: '#1769E0', fontSize: 30, fontWeight: '700', lineHeight: 34 },
+  spotListButton: { position: 'absolute', left: 18, minHeight: 50, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, borderRadius: 25, backgroundColor: '#172033', shadowColor: '#0A1930', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.2, shadowRadius: 10 },
+  spotListButtonText: { color: '#FFF', fontSize: 14, fontWeight: '700' }, spotCountBadge: { minWidth: 24, height: 24, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6, borderRadius: 12, backgroundColor: '#E05A2A' }, spotCountText: { color: '#FFF', fontSize: 12, fontWeight: '800' },
 });
