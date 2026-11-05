@@ -16,9 +16,15 @@ async function openAndMigrateDatabase() {
       note TEXT NOT NULL DEFAULT '',
       latitude REAL NOT NULL,
       longitude REAL NOT NULL,
-      created_at TEXT NOT NULL
+      created_at TEXT NOT NULL,
+      photo_uri TEXT
     );
   `);
+
+  const columns = await database.getAllAsync<{ name: string }>('PRAGMA table_info(spots)');
+  if (!columns.some((column) => column.name === 'photo_uri')) {
+    await database.execAsync('ALTER TABLE spots ADD COLUMN photo_uri TEXT;');
+  }
 
   return database;
 }

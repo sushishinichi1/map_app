@@ -33,6 +33,14 @@
         }
       ],
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "スポットに写真を添付するために写真ライブラリを使用します。",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#208AEF",

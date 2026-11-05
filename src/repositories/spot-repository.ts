@@ -8,6 +8,7 @@ type SpotRow = {
   latitude: number;
   longitude: number;
   created_at: string;
+  photo_uri: string | null;
 };
 
 function toSpot(row: SpotRow): Spot {
@@ -18,6 +19,7 @@ function toSpot(row: SpotRow): Spot {
     latitude: row.latitude,
     longitude: row.longitude,
     createdAt: row.created_at,
+    photoUri: row.photo_uri,
   };
 }
 
@@ -41,7 +43,7 @@ export async function createSpot(input: CreateSpotInput): Promise<Spot> {
     [input.name, input.note, input.latitude, input.longitude, createdAt],
   );
 
-  return { id: result.lastInsertRowId, ...input, createdAt };
+  return { id: result.lastInsertRowId, ...input, createdAt, photoUri: null };
 }
 
 export async function updateSpot(id: number, input: UpdateSpotInput): Promise<Spot | null> {
@@ -58,4 +60,14 @@ export async function deleteSpot(id: number): Promise<boolean> {
   const database = await getDatabase();
   const result = await database.runAsync('DELETE FROM spots WHERE id = ?', [id]);
   return result.changes > 0;
+}
+
+export async function updateSpotPhotoUri(id: number, photoUri: string | null): Promise<Spot | null> {
+  const database = await getDatabase();
+  const result = await database.runAsync('UPDATE spots SET photo_uri = ? WHERE id = ?', [
+    photoUri,
+    id,
+  ]);
+
+  return result.changes === 0 ? null : getSpotById(id);
 }

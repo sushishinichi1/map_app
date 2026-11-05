@@ -1,10 +1,11 @@
 import { useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, type LongPressEvent, type Region } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useCurrentLocation } from '@/hooks/use-current-location';
 import { useSpots } from '@/hooks/use-spots';
+import { deleteStoredSpotPhoto, pickAndStoreSpotPhoto } from '@/services/spot-photo-storage';
 import type { CreateSpotInput, Spot } from '@/types/spot';
 import { LocationStateView } from './location-state-view';
 import { SpotDetailModal } from './spot-detail-modal';
@@ -21,6 +22,7 @@ export function LocationMap() {
   const [draftCoordinate, setDraftCoordinate] = useState<Coordinate | null>(null);
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   const [editingSpot, setEditingSpot] = useState<Spot | null>(null);
+  const [isPhotoBusy, setIsPhotoBusy] = useState(false);
 
   if (location.status === 'loading') return <LocationStateView />;
   if (location.status === 'error') {
@@ -74,10 +76,69 @@ export function LocationMap() {
         onPress: () => {
           void spotState.deleteSpot(spot.id).then((deleted) => {
             if (deleted) {
+              void deleteStoredSpotPhoto(spot.photoUri);
               setSelectedSpot(null);
             } else {
               Alert.alert('削除できませんでした', '時間をおいてもう一度お試しください。');
             }
+          });
+        },
+      },
+    ]);
+  };
+
+  const changePhoto = async (spot: Spot) => {
+    if (isPhotoBusy) return;
+    setIsPhotoBusy(true);
+    try {
+      const result = await pickAndStoreSpotPhoto();
+      if (result.status === 'canceled') return;
+      if (result.status === 'denied') {
+        Alert.alert(
+          '写真へのアクセスが必要です',
+          'スポットに写真を添付するため、写真ライブラリへのアクセスを許可してください。',
+          [
+            { text: 'キャンセル', style: 'cancel' },
+            ...(!result.canAskAgain
+              ? [{ text: '設定を開く', onPress: () => void Linking.openSettings() }]
+              : []),
+          ],
+        );
+        return;
+      }
+      if (result.status === 'error') {
+        Alert.alert('写真を保存できませんでした', '時間をおいてもう一度お試しください。');
+        return;
+      }
+
+      const updated = await spotState.updateSpotPhotoUri(spot.id, result.uri);
+      if (!updated) {
+        await deleteStoredSpotPhoto(result.uri);
+        Alert.alert('写真を保存できませんでした', 'データベースを更新できませんでした。');
+        return;
+      }
+
+      await deleteStoredSpotPhoto(spot.photoUri);
+      setSelectedSpot(updated);
+    } finally {
+      setIsPhotoBusy(false);
+    }
+  };
+
+  const confirmRemovePhoto = (spot: Spot) => {
+    Alert.alert('写真を削除', 'このスポットから写真を削除しますか？', [
+      { text: 'キャンセル', style: 'cancel' },
+      {
+        text: '削除',
+        style: 'destructive',
+        onPress: () => {
+          void spotState.updateSpotPhotoUri(spot.id, null).then(async (updated) => {
+            if (!updated) {
+              Alert.alert('写真を削除できませんでした', '時間をおいてもう一度お試しください。');
+              return;
+            }
+            await deleteStoredSpotPhoto(spot.photoUri);
+            setSelectedSpot(updated);
           });
         },
       },
@@ -127,7 +188,7 @@ export function LocationMap() {
     </Pressable>
 
     <SpotFormModal coordinate={draftCoordinate} isSaving={spotState.isMutating} onCancel={() => setDraftCoordinate(null)} onSave={saveSpot} />
-    <SpotDetailModal spot={selectedSpot} isMutating={spotState.isMutating} onClose={() => setSelectedSpot(null)} onEdit={editSpot} onDelete={confirmDelete} />
+    <SpotDetailModal spot={selectedSpot} isMutating={spotState.isMutating || isPhotoBusy} onClose={() => { if (!spotState.isMutating && !isPhotoBusy) setSelectedSpot(null); }} onEdit={editSpot} onDelete={confirmDelete} onChangePhoto={(spot) => void changePhoto(spot)} onRemovePhoto={confirmRemovePhoto} />
     {editingSpot && <SpotEditModal spot={editingSpot} isSaving={spotState.isMutating} onCancel={cancelEdit} onSave={saveEditedSpot} />}
   </View>;
 }

@@ -4,6 +4,7 @@ import {
   createSpot as insertSpot,
   deleteSpot as removeSpot,
   getAllSpots,
+  updateSpotPhotoUri as persistSpotPhotoUri,
   updateSpot as persistSpot,
 } from '@/repositories/spot-repository';
 import type { CreateSpotInput, Spot, UpdateSpotInput } from '@/types/spot';
@@ -75,5 +76,21 @@ export function useSpots() {
     }
   }, []);
 
-  return { spots, isLoading, isMutating, error, clearError: () => setError(null), reload, createSpot, updateSpot, deleteSpot };
+  const updateSpotPhotoUri = useCallback(async (id: number, photoUri: string | null) => {
+    setIsMutating(true);
+    setError(null);
+    try {
+      const updated = await persistSpotPhotoUri(id, photoUri);
+      if (!updated) throw new Error('Spot not found');
+      setSpots((current) => current.map((spot) => (spot.id === id ? updated : spot)));
+      return updated;
+    } catch {
+      setError('写真を更新できませんでした。');
+      return null;
+    } finally {
+      setIsMutating(false);
+    }
+  }, []);
+
+  return { spots, isLoading, isMutating, error, clearError: () => setError(null), reload, createSpot, updateSpot, deleteSpot, updateSpotPhotoUri };
 }
